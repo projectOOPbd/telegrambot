@@ -2,6 +2,7 @@ from config import TOKEN
 import telebot
 import sqlite3
 from threading import Thread
+from keyboard import welcomingkeyboard
 
 bot = telebot.TeleBot(TOKEN)
 
@@ -28,12 +29,24 @@ def handle_start(message):
 
     if result is None:
         # Якщо запис відсутній, запитуємо як до користувача звертатись
-        bot.send_message(message.chat.id, 'Привіт! Я новий бот. Як до вас звертатись?')
-        bot.register_next_step_handler(message, save_name)
+        bot.send_message(message.chat.id, 'Привіт! Я новий бот. Як до вас звертатись?', reply_markup=welcomingkeyboard)
     else:
         # Якщо запис існує, відправляємо вітання з іменем користувача
         full_name = result[0]
         bot.send_message(message.chat.id, f'Привіт, {full_name}! Почніть надсилати повідомлення, і я їх повторю.')
+
+
+@bot.callback_query_handler(func=lambda call: True)
+def handle_inline_callback(call):
+    if call.data == 'username':
+        cursor.execute('INSERT INTO users (id, full_name, username) VALUES (?, ?, ?)',
+                       (call.message.chat.id, call.from_user.username, call.from_user.username))
+        conn.commit()
+        bot.send_message(call.message.chat.id, f'Дуже приємно, {call.from_user.username}! Почніть надсилати '
+                                               f'повідомлення, і я їх повторю.')
+    elif call.data == 'fullname':
+        bot.send_message(call.message.chat.id, 'Введіть псевдонім:')
+        bot.register_next_step_handler(call.message, save_name)
 
 
 def save_name(message):
