@@ -4,6 +4,8 @@ import sqlite3
 from threading import Thread
 from keyboard import welcomingkeyboard
 from keyboard import changekeyboard
+from keyboard import keyboard
+from keyboard import search_choice_keyboard
 
 bot = telebot.TeleBot(TOKEN)
 
@@ -36,16 +38,23 @@ def handle_start(message):
         full_name = result[0]
         bot.send_message(message.chat.id, f'Привіт, {full_name}! Почніть надсилати повідомлення, і я їх повторю.')
 
+    bot.send_message(message.chat.id, 'Виберіть опцію:', reply_markup=keyboard)
+
 
 @bot.callback_query_handler(func=lambda call: True)
 def handle_inline_callback(call):
     if call.data == 'username':
-        cursor.execute('INSERT INTO users (id, full_name, username) VALUES (?, ?, ?)',
-                       (call.message.chat.id, call.from_user.username, call.from_user.username))
-        conn.commit()
-        bot.send_message(call.message.chat.id, f'Дуже приємно, {call.from_user.username}! Почніть надсилати '
-                                               f'повідомлення, і я їх повторю.')
-        bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id)
+        if call.from_user.username:
+
+            cursor.execute('INSERT INTO users (id, full_name, username) VALUES (?, ?, ?)',
+                           (call.message.chat.id, call.from_user.username, call.from_user.username))
+            conn.commit()
+            bot.send_message(call.message.chat.id, f'Дуже приємно, {call.from_user.username}! Почніть надсилати '
+                                                   f'повідомлення, і я їх повторю.')
+        else:
+            bot.send_message(call.message.chat.id, 'У вас відсутнє ім`я користувача. Будь ласка, введіть псевдонім:')
+            bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id)
+            bot.register_next_step_handler(call.message, save_name)
     elif call.data == 'fullname':
         bot.send_message(call.message.chat.id, 'Введіть псевдонім:')
         bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id)
@@ -55,12 +64,26 @@ def handle_inline_callback(call):
         bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id)
         bot.register_next_step_handler(call.message, update_username)
     elif call.data == "user":
-        cursor.execute('UPDATE users SET full_name=? WHERE id=?',
-                       (call.from_user.username, call.message.chat.id))
-        conn.commit()
+        if call.from_user.username:
+            cursor.execute('UPDATE users SET full_name=? WHERE id=?',
+                           (call.from_user.username, call.message.chat.id))
+            conn.commit()
+            bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id)
+            bot.send_message(call.message.chat.id, f'Ваш новий псевдонім: {call.from_user.username}! Почніть надсилати '
+                                                   f'повідомлення, і я їх повторю.')
+        else:
+            bot.send_message(call.message.chat.id, 'У вас відсутнє ім`я користувача. Будь ласка, введіть псевдонім:')
+            bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id)
+            bot.register_next_step_handler(call.message, update_username)
+
+    elif call.data == 'search_title':
+        bot.send_message(call.message.chat.id, 'Введіть назву книги:')
         bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id)
-        bot.send_message(call.message.chat.id, f'Ваш новий псевдонім: {call.from_user.username}! Почніть надсилати '
-                                               f'повідомлення, і я їх повторю.')
+        bot.register_next_step_handler(call.message, search_books_by_title_inline)
+    elif call.data == 'search_author':
+        bot.send_message(call.message.chat.id, 'Введіть автора книги:')
+        bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id)
+        bot.register_next_step_handler(call.message, search_books_by_author_inline)
 
 
 def save_name(message):
@@ -100,15 +123,91 @@ def update_username(message):
     thread.start()
 
 
+def search_books_by_title(title, limit):
+    newcursor = conn.cursor()
+
+    # Виконуємо запит до бази даних з обмеженням на кількість результатів
+    newcursor.execute("SELECT nameBook, author, gpa, pdffile FROM book WHERE nameBook LIKE ? LIMIT ?",
+                      ('%' + title + '%', limit))
+    results = newcursor.fetchall()
+
+    return results
+
+
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
-    # Отримуємо повне ім'я користувача з бази даних
-    cursor.execute('SELECT full_name FROM users WHERE id=?', (message.chat.id,))
-    result = cursor.fetchone()
+    if message.text == 'Шукати книгу':
+        bot.send_message(message.chat.id, 'Виберіть метод пошуку:', reply_markup=search_choice_keyboard)
+    else:
+        # Отримуємо повне ім'я користувача з бази даних
+        cursor.execute('SELECT full_name FROM users WHERE id=?', (message.chat.id,))
+        result = cursor.fetchone()
 
-    if result is not None:
-        full_name = result[0]
-        bot.send_message(message.chat.id, f'{full_name}, ви написали: {message.text}')
+        if result is not None:
+            full_name = result[0]
+            bot.send_message(message.chat.id, f'{full_name}, ви написали: {message.text}')
+
+
+def search_books(message):
+    book_title = message.text
+
+    # Виклик функції пошуку книги за назвою з обмеженням на 5 результатів
+    results = search_books_by_title(book_title, 5)
+
+    if results:
+        response = ""
+        for row in results:
+            bookname, author, rating, pdffile = row
+            response += f"Автор: {author}\nНазва: {bookname}\nРейтинг: {rating}\nПосилання на PDF: {pdffile}\n\n"
+
+        bot.send_message(message.chat.id, response)
+    else:
+        bot.send_message(message.chat.id, "Книги не знайдено.")
+
+
+def search_books_by_title_inline(message):
+    book_title = message.text
+
+    # Виклик функції пошуку книги за назвою з обмеженням на 5 результатів
+    results = search_books_by_title(book_title, 5)
+
+    if results:
+        response = ""
+        for row in results:
+            bookname, author, rating, pdffile = row
+            response += f"Автор: {author}\nНазва: {bookname}\nРейтинг: {rating}\nПосилання на PDF: {pdffile}\n\n"
+
+        bot.send_message(message.chat.id, response)
+    else:
+        bot.send_message(message.chat.id, "Книги не знайдено.")
+
+
+def search_books_by_author_inline(message):
+    author = message.text
+
+    # Виклик функції пошуку книги за автором з обмеженням на 5 результатів
+    results = search_books_by_author(author, 5)
+
+    if results:
+        response = ""
+        for row in results:
+            bookname, author, rating, pdffile = row
+            response += f"Автор: {author}\nНазва: {bookname}\nРейтинг: {rating}\nПосилання на PDF: {pdffile}\n\n"
+
+        bot.send_message(message.chat.id, response)
+    else:
+        bot.send_message(message.chat.id, "Книги не знайдено.")
+
+
+def search_books_by_author(author, limit):
+    newcursor = conn.cursor()
+
+    # Виконуємо запит до бази даних з обмеженням на кількість результатів
+    newcursor.execute("SELECT nameBook, author, gpa, pdffile FROM book WHERE author LIKE ? LIMIT ?",
+                      ('%' + author + '%', limit))
+    results = newcursor.fetchall()
+
+    return results
 
 
 # Запуск бота
