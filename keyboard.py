@@ -1,6 +1,5 @@
 from telebot import types
 
-
 welcomingkeyboard = types.InlineKeyboardMarkup()
 
 username_button = types.InlineKeyboardButton(text="По імені", callback_data="username")
@@ -21,7 +20,6 @@ urlBtn = types.KeyboardButton('Посилання на інший канал Т�
 keyboard.add(searchBtn)
 keyboard.add(historyBtn, urlBtn)
 
-
 search_choice_keyboard = types.InlineKeyboardMarkup()
 search_choice_keyboard.row(types.InlineKeyboardButton(text='За назвою', callback_data='search_title'),
-                types.InlineKeyboardButton(text='За автором', callback_data='search_author'))
+                           types.InlineKeyboardButton(text='За автором', callback_data='search_author'))
