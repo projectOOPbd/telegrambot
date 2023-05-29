@@ -2,10 +2,7 @@ from config import TOKEN
 import telebot
 import sqlite3
 from threading import Thread
-from keyboard import welcomingkeyboard
-from keyboard import changekeyboard
-from keyboard import keyboard
-from keyboard import search_choice_keyboard
+from keyboard import *
 
 bot = telebot.TeleBot(TOKEN)
 
@@ -51,6 +48,11 @@ def handle_start(message):
         full_name = result[0]
         bot.send_message(message.chat.id, f'Привіт, {full_name}! Почніть надсилати повідомлення, і я їх повторю.')
 
+    bot.send_message(message.chat.id, 'Виберіть опцію:', reply_markup=keyboard)
+
+
+@bot.message_handler(commands=['menu'])
+def handle_menu(message):
     bot.send_message(message.chat.id, 'Виберіть опцію:', reply_markup=keyboard)
 
 
@@ -108,7 +110,6 @@ def save_name(message):
     conn.commit()
     bot.send_message(message.chat.id, f'Дуже приємно, {full_name}! Почніть надсилати повідомлення, і я їх повторю.')
 
-
 @bot.message_handler(commands=['change_username'])
 def handle_change_username(message):
     # Перевірка, чи існує запис користувача в базі даних
@@ -160,13 +161,14 @@ def search_books_by_title(title, limit):
     return results
 
 
-
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
     if message.text == 'Шукати книгу':
         bot.send_message(message.chat.id, 'Виберіть метод пошуку:', reply_markup=search_choice_keyboard)
     elif message.text == 'Історія переглядів':
         show_search_history(message)
+    elif message.text == "Посилання":
+        bot.send_message(message.chat.id, 'Корисні посилання:', reply_markup=urlkeyboard)
     else:
         # Отримуємо повне ім'я користувача з бази даних
         cursor.execute('SELECT full_name FROM users WHERE id=?', (message.chat.id,))
@@ -318,7 +320,7 @@ def show_search_history(message):
                     result = search_books_by_title(query, 1)
                     if result:
                         response = ""
-                        board = telebot.types.InlineKeyboardMarkup()
+                        board = telebot.types.InlineKeyboardMarkup(row_width=1)
                         for row in result:
                             bookname, author, rating, pdffile = row
                             response += f"Автор: {author}\nНазва: {bookname}\nРейтинг: {rating}\n\n"
@@ -326,18 +328,17 @@ def show_search_history(message):
                             link = f'{pdffile}'
                             result = cursor.fetchone()
                             full_name = result[0]
-                            update_search_history(message.chat.id, full_name, bookname)
                             button = telebot.types.InlineKeyboardButton(text='Посилання', url=link)
                             board.add(button)
 
                         bot.send_message(message.chat.id, response, reply_markup=board)
             else:
                 bot.send_message(message.chat.id, "Історія запитів порожня.")
+
         else:
             bot.send_message(message.chat.id, "Історія запитів порожня.")
     else:
         bot.send_message(message.chat.id, "Спочатку введіть своє ім'я.")
-
 
 # Запуск бота
 bot.polling()

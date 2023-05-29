@@ -16,10 +16,16 @@ keyboard = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
 
 searchBtn = types.KeyboardButton('Шукати книгу')
 historyBtn = types.KeyboardButton('Історія переглядів')
-urlBtn = types.KeyboardButton('Посилання на інший канал Телеграм')
+urlBtn = types.KeyboardButton('Посилання')
 keyboard.add(searchBtn)
 keyboard.add(historyBtn, urlBtn)
 
 search_choice_keyboard = types.InlineKeyboardMarkup()
 search_choice_keyboard.row(types.InlineKeyboardButton(text='За назвою', callback_data='search_title'),
                            types.InlineKeyboardButton(text='За автором', callback_data='search_author'))
+
+urlkeyboard = types.InlineKeyboardMarkup(row_width=1)
+
+vnsurl=types.InlineKeyboardButton(text= 'Внутрішнє начальне середовище', url='https://vns.lpnu.ua/login/index.php')
+boturl=types.InlineKeyboardButton(text='Розклад LPNU', url='https://t.me/nulp_pro_bot')
+urlkeyboard.add(boturl, vnsurl)
