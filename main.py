@@ -3,7 +3,7 @@ import telebot
 import sqlite3
 from threading import Thread
 from keyboard import *
-
+import os
 bot = telebot.TeleBot(TOKEN)
 
 # Підключення до бази даних SQLite
@@ -110,6 +110,7 @@ def save_name(message):
     conn.commit()
     bot.send_message(message.chat.id, f'Дуже приємно, {full_name}! Почніть надсилати повідомлення, і я їх повторю.')
 
+
 @bot.message_handler(commands=['change_username'])
 def handle_change_username(message):
     # Перевірка, чи існує запис користувача в базі даних
@@ -144,7 +145,7 @@ def search_books_by_title(title, limit):
     keywords = title.split()
 
     # Формуємо рядок запиту з урахуванням кількох слів у заголовку
-    query = "SELECT nameBook, author, gpa, pdffile FROM book WHERE "
+    query = "SELECT nameBook, author, gpa, pdffile, binary FROM book WHERE "
     conditions = []
     for keyword in keywords:
         conditions.append("nameBook LIKE ?")
@@ -201,20 +202,26 @@ def search_books_by_title_inline(message):
     # Виклик функції пошуку книги за назвою з обмеженням на 5 результатів
     results = search_books_by_title(book_title, 5)
     board = telebot.types.InlineKeyboardMarkup()
+    temp_file_path = ''
     if results:
         response = ""
         for row in results:
-            bookname, author, rating, pdffile = row
+            bookname, author, rating, pdffile, binary = row
             response += f"Автор: {author}\nНазва: {bookname}\nРейтинг: {rating}\n\n"
             cursor.execute('SELECT full_name FROM users WHERE id=?', (message.chat.id,))
-            link = f'{pdffile}'
             result = cursor.fetchone()
             full_name = result[0]
+            link = f'{pdffile}'
             update_search_history(message.chat.id, full_name, bookname)
+            temp_file_path = f'{bookname}.pdf'
+            with open(temp_file_path, 'wb') as file:
+                file.write(binary)
             button = telebot.types.InlineKeyboardButton(text='Посилання', url=link)
             board.add(button)
 
-        bot.send_message(message.chat.id, response, reply_markup=board)
+        with open(temp_file_path, 'rb') as file:
+            bot.send_document(message.chat.id, file, caption=response, reply_markup=board)
+        os.remove(temp_file_path)
 
     else:
         bot.send_message(message.chat.id, "Книги не знайдено.")
@@ -222,24 +229,29 @@ def search_books_by_title_inline(message):
 
 def search_books_by_author_inline(message):
     author = message.text
-
+    temp_file_path = ''
     # Виклик функції пошуку книги за автором з обмеженням на 5 результатів
     results = search_books_by_author(author, 5)
     board = telebot.types.InlineKeyboardMarkup()
     if results:
         response = ""
         for row in results:
-            bookname, author, rating, pdffile = row
+            bookname, author, rating, pdffile, binary = row
             response += f"Автор: {author}\nНазва: {bookname}\nРейтинг: {rating}\n\n"
             cursor.execute('SELECT full_name FROM users WHERE id=?', (message.chat.id,))
             link = f'{pdffile}'
             result = cursor.fetchone()
             full_name = result[0]
             update_search_history(message.chat.id, full_name, bookname)
+            temp_file_path = f'{bookname}.pdf'
+            with open(temp_file_path, 'wb') as file:
+                file.write(binary)
             button = telebot.types.InlineKeyboardButton(text='Посилання', url=link)
             board.add(button)
 
-        bot.send_message(message.chat.id, response, reply_markup=board)
+        with open(temp_file_path, 'rb') as file:
+            bot.send_document(message.chat.id, file, caption=response, reply_markup=board)
+        os.remove(temp_file_path)
     else:
         bot.send_message(message.chat.id, "Книги не знайдено.")
 
@@ -251,7 +263,7 @@ def search_books_by_author(author, limit):
     keywords = author.split()
 
     # Формуємо рядок запиту з урахуванням кількох слів у заголовку
-    query = "SELECT nameBook, author, gpa, pdffile FROM book WHERE "
+    query = "SELECT nameBook, author, gpa, pdffile, binary FROM book WHERE "
     conditions = []
     for keyword in keywords:
         conditions.append("author LIKE ?")
@@ -297,7 +309,7 @@ def show_search_history(message):
     # Отримуємо повне ім'я користувача з бази даних
     cursor.execute('SELECT full_name FROM users WHERE id=?', (message.chat.id,))
     result = cursor.fetchone()
-
+    temp_file_path = ''
     if result is not None:
         full_name = result[0]
 
@@ -322,16 +334,21 @@ def show_search_history(message):
                         response = ""
                         board = telebot.types.InlineKeyboardMarkup(row_width=1)
                         for row in result:
-                            bookname, author, rating, pdffile = row
+                            bookname, author, rating, pdffile, binary = row
                             response += f"Автор: {author}\nНазва: {bookname}\nРейтинг: {rating}\n\n"
                             cursor.execute('SELECT full_name FROM users WHERE id=?', (message.chat.id,))
                             link = f'{pdffile}'
                             result = cursor.fetchone()
                             full_name = result[0]
+                            temp_file_path = f'{bookname}.pdf'
+                            with open(temp_file_path, 'wb') as file:
+                                file.write(binary)
                             button = telebot.types.InlineKeyboardButton(text='Посилання', url=link)
                             board.add(button)
 
-                        bot.send_message(message.chat.id, response, reply_markup=board)
+                        with open(temp_file_path, 'rb') as file:
+                            bot.send_document(message.chat.id, file, caption=response, reply_markup=board)
+                        os.remove(temp_file_path)
             else:
                 bot.send_message(message.chat.id, "Історія запитів порожня.")
 
@@ -339,6 +356,7 @@ def show_search_history(message):
             bot.send_message(message.chat.id, "Історія запитів порожня.")
     else:
         bot.send_message(message.chat.id, "Спочатку введіть своє ім'я.")
+
 
 # Запуск бота
 bot.polling()
