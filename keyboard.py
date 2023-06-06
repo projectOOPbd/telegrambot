@@ -12,13 +12,14 @@ username_button = types.InlineKeyboardButton(text="По імені", callback_da
 fullName_button = types.InlineKeyboardButton(text="За псевдонімом", callback_data="full")
 changekeyboard.add(username_button, fullName_button)
 
-keyboard = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
+keyboard = types.ReplyKeyboardMarkup(row_width=1, resize_keyboard=True)
 
 searchBtn = types.KeyboardButton('Шукати книгу')
 historyBtn = types.KeyboardButton('Історія переглядів')
-urlBtn = types.KeyboardButton('Посилання')
+urlBtn = types.KeyboardButton('Посилання для навчання')
+rateBtn = types.KeyboardButton('Оцінити книгу')
 keyboard.add(searchBtn)
-keyboard.add(historyBtn, urlBtn)
+keyboard.add(historyBtn, urlBtn, rateBtn)
 
 search_choice_keyboard = types.InlineKeyboardMarkup()
 search_choice_keyboard.row(types.InlineKeyboardButton(text='За назвою', callback_data='search_title'),
